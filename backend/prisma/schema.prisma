@@ -1,0 +1,107 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  username     String   @unique
+  timezone     String   @default("UTC")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  schedule       ScheduleInterval[]
+  eventTypes     EventType[]
+  bookings       Booking[]
+  passwordResets PasswordReset[]
+  refreshTokens  RefreshToken[]
+}
+
+model ScheduleInterval {
+  id        String @id @default(uuid())
+  userId    String
+  dayOfWeek Int
+  startTime String
+  endTime   String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dayOfWeek, startTime, endTime])
+  @@index([userId])
+}
+
+model EventType {
+  id              String   @id @default(uuid())
+  userId          String
+  name            String
+  description     String?
+  slug            String
+  durationMinutes Int      @default(30)
+  slotInterval    Int      @default(30)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookings Booking[]
+
+  @@unique([userId, slug])
+  @@index([userId])
+}
+
+enum BookingStatus {
+  confirmed
+  cancelled
+}
+
+model Booking {
+  id           String        @id @default(uuid())
+  eventTypeId  String
+  userId       String
+  startTime    DateTime
+  endTime      DateTime
+  guestName    String
+  guestEmail   String
+  guestPhone   String?
+  cancelToken  String        @unique
+  status       BookingStatus @default(confirmed)
+  cancelledAt  DateTime?
+  createdAt    DateTime      @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  eventType EventType @relation(fields: [eventTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, startTime])
+  @@index([userId, startTime])
+  @@index([eventTypeId])
+}
+
+model PasswordReset {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}

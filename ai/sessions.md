@@ -1,0 +1,56 @@
+# Sessions
+
+## Сессия 1 — 2026-04-08
+
+### Цель
+Определить архитектуру, стек, доменные сущности и создать проектную документацию.
+
+### Что сделали
+- Определили стек: React + Vite + Mantine / NestJS + Prisma / PostgreSQL
+- Выбрали архитектуру: монорепо, несколько владельцев (вариант B), JWT-авторизация
+- Определили доменные сущности: User, Schedule, EventType, Booking, PasswordReset
+- Спроектировали URL-схему: `/:username/:eventSlug`
+- Спроектировали API-эндпоинты (public + auth + admin)
+- Создали `ai/README.md`, `ai/progress.md`, `ai/sessions.md`
+- Создали `ai/project-mvp-plan.md`
+- Создали `api-contract/api-contract.md`
+- Создали `api-contract/typespec/` (main.tsp, models.tsp, routes.tsp)
+
+### Решения
+- **Prisma вместо TypeORM**: проще для учебного проекта, меньше бойлерплейта, автогенерация типов, Prisma Studio
+- **JWT в httpOnly cookie**: защита от XSS, Access Token (15 мин) + Refresh Token (7 дней)
+- **Username при регистрации**: пользователь выбирает сам, глобально уникальный, проверка на лету
+- **Slug уникальный в рамках владельца**: составной ключ `(userId, slug)`
+- **Расписание**: несколько интервалов на день, настраивается из кабинета
+- **Отмена бронирования**: гость отменяет по cancelToken (UUID) без авторизации
+- **Password recovery**: полный флоу с токеном в БД, email — заглушка на MVP
+- **Email**: фаза 1 — только подтверждение на экране, фаза 2 — Resend
+
+### Следующий шаг
+Инициализировать `backend/` и `frontend/`, настроить Prisma schema, Docker Compose.
+
+## Сессия 2 — 2026-04-08
+
+### Цель
+Инициализировать проект: backend, frontend, Prisma, Docker Compose. Переименовать `specs/` → `api-contract/`.
+
+### Что сделали
+- Переименовали `specs/` → `api-contract/` (specs ассоциируется с тестами)
+- Инициализировали `backend/`: NestJS + Prisma v7 (с @prisma/adapter-pg) + JWT + passport + cookie-parser
+- Инициализировали `frontend/`: React + Vite + Mantine + TanStack Router + Zustand + Axios
+- Написали Prisma schema (User, ScheduleInterval, EventType, Booking, PasswordReset, RefreshToken)
+- Написали seed-файл с демо-пользователем
+- Создали структуру модулей backend: auth, users, events, schedule, bookings, slots
+- Создали структуру frontend: api-клиент, типы, pages, hooks, stores
+- Написали Dockerfile для backend и frontend (multi-stage)
+- Написали docker-compose.yml (PostgreSQL + backend + frontend)
+- Оба проекта успешно компилируются
+
+### Решения
+- **Prisma v7**: требует `@prisma/adapter-pg` + `pg` для подключения к PostgreSQL. Генерация в `src/generated/`.
+- **NestJS global prefix**: `/api` для всех маршрутов, кроме корня
+- **ValidationPipe**: whitelist + forbidNonWhitelisted + transform на глобальном уровне
+- **CORS**: credentials: true, origin из конфига
+
+### Следующий шаг
+Реализовать Auth модуль (регистрация, логин, JWT, password recovery).
