@@ -49,7 +49,14 @@ export function EventsPage({ navigate }: { navigate: Navigate }) {
           >
             <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }}>
               {eventTypes.map((eventType) => (
-                <Card key={eventType.id} withBorder shadow="sm" padding="lg" radius="md">
+                <Card
+                  key={eventType.id}
+                  withBorder
+                  shadow="sm"
+                  padding="lg"
+                  radius="md"
+                  data-testid={`event-type-${eventType.title.toLowerCase().replaceAll(" ", "-")}`}
+                >
                   <Stack h="100%">
                     <Group justify="space-between" align="flex-start">
                       <Title order={3}>{eventType.title}</Title>

@@ -65,6 +65,9 @@ export function SlotCalendar({
                   isSelected ? "calendar-day-selected" : "",
                   isOutside ? "calendar-day-outside" : "",
                 ].join(" ")}
+                data-date={date}
+                data-free-count={slotDay?.freeCount ?? 0}
+                data-testid={`calendar-day-${date}`}
                 onClick={() => onSelectDate(date)}
               >
                 <Text size="sm">{cell.date()}</Text>

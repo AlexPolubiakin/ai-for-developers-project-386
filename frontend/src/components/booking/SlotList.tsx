@@ -52,6 +52,8 @@ export function SlotList({
                   isSelected ? "slot-row-selected" : "",
                   !isFree ? "slot-row-disabled" : "",
                 ].join(" ")}
+                data-status={slot.status}
+                data-testid="slot-option"
                 disabled={!isFree}
                 onClick={() => onSelectSlot(slot)}
               >

@@ -73,9 +73,22 @@ export function GuestForm({
               Изменить
             </Button>
           </Group>
-          <TextInput placeholder="Имя" {...form.getInputProps("guestName")} />
-          <TextInput placeholder="Email" {...form.getInputProps("guestEmail")} />
-          <Button type="submit" loading={submitting} className="primary-cta">
+          <TextInput
+            data-testid="guest-name"
+            placeholder="Имя"
+            {...form.getInputProps("guestName")}
+          />
+          <TextInput
+            data-testid="guest-email"
+            placeholder="Email"
+            {...form.getInputProps("guestEmail")}
+          />
+          <Button
+            type="submit"
+            loading={submitting}
+            className="primary-cta"
+            data-testid="confirm-booking"
+          >
             Подтвердить запись
           </Button>
         </Stack>
