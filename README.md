@@ -1,6 +1,10 @@
 ### Hexlet tests and linter status:
 [![Actions Status](https://github.com/AlexPolubiakin/ai-for-developers-project-386/actions/workflows/hexlet-check.yml/badge.svg)](https://github.com/AlexPolubiakin/ai-for-developers-project-386/actions)
 
+## Deployed Application
+
+https://calclone-y37m.onrender.com/
+
 ## Project Commands
 
 All common commands are available through the root `Makefile`.
