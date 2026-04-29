@@ -1,46 +1,65 @@
 # Progress
 
-## Планирование и спецификация
+## Current MVP Scope
+
+Ближайшая цель — закончить небольшое приложение в подходе Design First: один заранее заданный владелец без авторизации, управление типами событий, публичная запись на свободный слот и список предстоящих встреч.
+
+## Planning And Design
 
 - [x] 1. Создать `ai/` со всеми md-файлами
-- [x] 2. Написать `project-mvp-plan.md`
-- [x] 3. Написать `api-contract/api-contract.md`
-- [x] 4. Написать TypeSpec (`api-contract/typespec/`)
+- [x] 2. Написать первичный `project-mvp-plan.md`
+- [x] 3. Написать первичный `api-contract/api-contract.md`
+- [x] 4. Написать первичный TypeSpec (`api-contract/typespec/`)
+- [x] 5. Разобрать целевые экраны из `screens/`
+- [x] 6. Зафиксировать UI flow в `frontend/SCREENS.md`
+- [x] 7. Пересобрать MVP-скоуп без auth и личных кабинетов
 
-## Инициализация проекта
+## Project Initialization
 
-- [x] 5. Инициализировать `backend/` (NestJS + Prisma + ESLint/Prettier)
-- [x] 6. Инициализировать `frontend/` (React + Vite + Mantine + ESLint/Prettier)
-- [x] 7. Prisma schema + seed
-- [x] 8. Docker Compose (PostgreSQL + backend + frontend)
+- [x] 8. Инициализировать `backend/` (NestJS + Prisma + ESLint/Prettier)
+- [x] 9. Инициализировать `frontend/` (React + Vite + Mantine + ESLint/Prettier)
+- [x] 10. Добавить Prisma schema и seed для демо-владельца
+- [x] 11. Добавить Docker Compose (PostgreSQL + backend + frontend)
 
-## Backend
+## Contract
 
-- [ ] 9. Auth модуль (регистрация, логин, JWT, password recovery)
-- [ ] 10. Events модуль (CRUD типов событий)
-- [ ] 11. Schedule модуль (интервалы по дням)
-- [ ] 12. Slots сервис (генерация свободных слотов на 14 дней)
-- [ ] 13. Bookings модуль (создание, отмена, список)
+- [x] 12. Упростить `api-contract/api-contract.md` под no-auth owner/public MVP
+- [x] 13. Упростить TypeSpec: убрать auth/password reset и зафиксировать owner/public API
 
-## Frontend
+## Backend MVP
 
-- [ ] 14. Auth страницы (Login, Register, Forgot-password, Reset-password)
-- [ ] 15. Dashboard — Events (CRUD типов событий)
-- [ ] 16. Dashboard — Schedule (редактор расписания по дням)
-- [ ] 17. Dashboard — Bookings (список бронирований)
-- [ ] 18. Публичные страницы (профиль, календарь, форма бронирования, отмена)
+- [ ] 14. Упростить Prisma schema: оставить только сущности, нужные для MVP
+- [ ] 15. Реализовать owner endpoints для списка и создания типов событий
+- [ ] 16. Реализовать публичные endpoints получения типов событий
+- [ ] 17. Реализовать генерацию свободных слотов на 14 дней
+- [ ] 18. Реализовать создание бронирования с проверкой конфликта
+- [ ] 19. Реализовать owner endpoint списка предстоящих подтвержденных встреч
+- [ ] 20. Обновить seed под данные, совпадающие со скриншотами
 
-## Тестирование
+## Frontend MVP
 
-- [ ] 19. Backend тесты (Unit + Integration)
-- [ ] 20. Frontend тесты (Unit + Component)
-- [ ] 21. E2E тесты (Playwright)
+- [ ] 21. Заменить Vite starter на реальное приложение
+- [ ] 22. Реализовать общий header/layout по скриншотам
+- [ ] 23. Сверстать лендинг `/`
+- [ ] 24. Сверстать страницу выбора типов событий
+- [ ] 25. Сверстать booking flow: выбор даты, слота, форма гостя, подтверждение
+- [ ] 26. Сверстать страницу предстоящих событий
+- [ ] 27. Добавить простую owner-форму создания типа события
+- [ ] 28. Подключить frontend к owner/public backend endpoints
+- [ ] 29. Добавить базовые loading/error/empty состояния
 
-## CI/CD
+## Verification
 
-- [ ] 22. GitHub Actions (lint + test + build)
+- [x] 30. Проверить TypeSpec-компиляцию
+- [ ] 31. Проверить backend lint/test/build
+- [ ] 32. Проверить frontend lint/build
+- [ ] 33. Прогнать основной сценарий вручную: создать тип события, открыть гостевой flow, выбрать слот, создать бронь, увидеть ее в списке
 
 ## Post-MVP
 
-- [ ] 23. Email-уведомления (Resend)
-- [ ] 24. Напоминания (cron-задачи)
+- [ ] 34. Авторизация владельца и защищенный кабинет
+- [ ] 35. Редактирование и удаление типов событий
+- [ ] 36. Редактор расписания
+- [ ] 37. Отмена бронирования по ссылке
+- [ ] 38. Email-уведомления и напоминания
+- [ ] 39. GitHub Actions и E2E-тесты

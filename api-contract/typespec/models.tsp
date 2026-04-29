@@ -1,66 +1,69 @@
 using TypeSpec.Http;
 
-model User {
+model Owner {
   id: string;
 
-  @pattern("^[a-zA-Z][a-zA-Z0-9-]{2,29}$")
-  username: string;
+  @minLength(1)
+  name: string;
 
   @pattern("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")
   email: string;
 
-  name: string;
   timezone: string;
   createdAt: utcDateTime;
   updatedAt: utcDateTime;
 }
 
-model UserPublic {
-  name: string;
-  username: string;
-}
-
-model ScheduleInterval {
-  @minValue(0)
-  @maxValue(6)
-  dayOfWeek: int32;
-
-  @pattern("^\\d{2}:\\d{2}$")
-  startTime: string;
-
-  @pattern("^\\d{2}:\\d{2}$")
-  endTime: string;
-}
-
-model ScheduleIntervalWithId extends ScheduleInterval {
+model OwnerPublic {
   id: string;
-  userId: string;
+  name: string;
+  timezone: string;
 }
 
 model EventType {
   id: string;
-  userId: string;
-  name: string;
+  ownerId: string;
+
+  @minLength(1)
+  @maxLength(100)
+  title: string;
+
+  @maxLength(1000)
   description?: string;
 
-  @pattern("^[a-zA-Z0-9][a-zA-Z0-9-]{1,59}$")
-  slug: string;
-
-  @minValue(5)
+  @minValue(1)
   durationMinutes: int32;
-
-  @minValue(5)
-  slotInterval: int32;
 
   createdAt: utcDateTime;
   updatedAt: utcDateTime;
 }
 
 model EventTypePublic {
-  name: string;
-  slug: string;
+  id: string;
+  title: string;
   description?: string;
   durationMinutes: int32;
+}
+
+enum SlotStatus {
+  free: "free",
+  booked: "booked",
+}
+
+model Slot {
+  startTime: utcDateTime;
+  endTime: utcDateTime;
+  status: SlotStatus;
+}
+
+model SlotDay {
+  @pattern("^\\d{4}-\\d{2}-\\d{2}$")
+  date: string;
+
+  @minValue(0)
+  freeCount: int32;
+
+  slots: Slot[];
 }
 
 enum BookingStatus {
@@ -71,111 +74,35 @@ enum BookingStatus {
 model Booking {
   id: string;
   eventTypeId: string;
-  userId: string;
+  eventTypeTitle: string;
+  ownerId: string;
   startTime: utcDateTime;
   endTime: utcDateTime;
+
+  @minLength(1)
   guestName: string;
 
   @pattern("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")
   guestEmail: string;
 
-  guestPhone?: string;
-  cancelToken: string;
   status: BookingStatus;
-  cancelledAt?: utcDateTime;
   createdAt: utcDateTime;
-}
-
-model BookingPublic {
-  id: string;
-  startTime: utcDateTime;
-  endTime: utcDateTime;
-  cancelToken: string;
-}
-
-model BookingDetails {
-  startTime: utcDateTime;
-  endTime: utcDateTime;
-  eventTypeName: string;
-  ownerName: string;
-  status: BookingStatus;
-}
-
-model Slot {
-  startTime: utcDateTime;
-  endTime: utcDateTime;
-}
-
-model RegisterRequest {
-  @pattern("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")
-  email: string;
-
-  @minLength(8)
-  password: string;
-
-  @minLength(1)
-  name: string;
-
-  @pattern("^[a-zA-Z][a-zA-Z0-9-]{2,29}$")
-  username: string;
-}
-
-model LoginRequest {
-  @pattern("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")
-  email: string;
-  password: string;
-}
-
-model ForgotPasswordRequest {
-  @pattern("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")
-  email: string;
-}
-
-model ResetPasswordRequest {
-  token: string;
-
-  @minLength(8)
-  newPassword: string;
 }
 
 model CreateEventTypeRequest {
   @minLength(1)
   @maxLength(100)
-  name: string;
+  title: string;
 
+  @maxLength(1000)
   description?: string;
 
-  @pattern("^[a-zA-Z0-9][a-zA-Z0-9-]{1,59}$")
-  slug: string;
-
-  @minValue(5)
+  @minValue(1)
   durationMinutes: int32;
-
-  @minValue(5)
-  slotInterval: int32;
-}
-
-model UpdateEventTypeRequest {
-  @minLength(1)
-  @maxLength(100)
-  name?: string;
-
-  description?: string;
-
-  @minValue(5)
-  durationMinutes?: int32;
-
-  @minValue(5)
-  slotInterval?: int32;
-}
-
-model UpdateScheduleRequest {
-  intervals: ScheduleInterval[];
 }
 
 model CreateBookingRequest {
-  username: string;
-  eventSlug: string;
+  eventTypeId: string;
   startTime: utcDateTime;
 
   @minLength(1)
@@ -183,20 +110,45 @@ model CreateBookingRequest {
 
   @pattern("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")
   guestEmail: string;
-
-  guestPhone?: string;
 }
 
-model ErrorResponse {
-  statusCode: int32;
-  message: string;
-  error?: string;
+model OwnerEventTypesResponse {
+  eventTypes: EventType[];
 }
 
-model ValidationErrorResponse {
-  statusCode: int32;
-  message: string;
-  errors: FieldError[];
+model EventTypeResponse {
+  eventType: EventType;
+}
+
+model CreatedEventTypeResponse {
+  @statusCode statusCode: 201;
+  eventType: EventType;
+}
+
+model PublicEventTypesResponse {
+  owner: OwnerPublic;
+  eventTypes: EventTypePublic[];
+}
+
+model PublicEventTypeResponse {
+  eventType: EventTypePublic;
+}
+
+model SlotsResponse {
+  days: SlotDay[];
+}
+
+model BookingResponse {
+  booking: Booking;
+}
+
+model CreatedBookingResponse {
+  @statusCode statusCode: 201;
+  booking: Booking;
+}
+
+model BookingsListResponse {
+  bookings: Booking[];
 }
 
 model FieldError {
@@ -204,36 +156,19 @@ model FieldError {
   message: string;
 }
 
-model UsernameCheckResponse {
-  available: boolean;
+model ValidationResponse {
+  @statusCode statusCode: 400;
+  message: string;
+  errors: FieldError[];
 }
 
-model AuthResponse {
-  user: User;
+model NotFoundErrorResponse {
+  @statusCode statusCode: 404;
+  message: string;
 }
 
-model PublicEventsResponse {
-  owner: UserPublic;
-  events: EventTypePublic[];
-}
-
-model SlotsResponse {
-  slots: Slot[];
-}
-
-model BookingsListResponse {
-  bookings: BookingWithEvent[];
-}
-
-model BookingWithEvent {
-  id: string;
-  guestName: string;
-  guestEmail: string;
-  guestPhone?: string;
-  startTime: utcDateTime;
-  endTime: utcDateTime;
-  eventTypeName: string;
-  eventTypeSlug: string;
-  status: BookingStatus;
-  createdAt: utcDateTime;
+model ConflictErrorResponse {
+  @statusCode statusCode: 409;
+  message: string;
+  error?: string;
 }

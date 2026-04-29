@@ -6,8 +6,7 @@ import "./routes.tsp";
 
 using TypeSpec.Http;
 
-@service({
+@service(#{
   title: "CalClone Booking API",
-  version: "1.0.0",
 })
 namespace CalClone;

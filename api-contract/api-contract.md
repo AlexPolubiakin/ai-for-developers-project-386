@@ -1,296 +1,369 @@
 # API Contract
 
+## Назначение
+
+Этот документ фиксирует внешний контракт приложения «Запись на звонок». Проект выполняется в подходе Design First: frontend и backend реализуются по этому контракту и TypeSpec-спецификации из `api-contract/typespec/`.
+
+В MVP нет регистрации и авторизации. Владелец календаря один и заранее задан на стороне backend. Все owner endpoints работают с этим владельцем по умолчанию.
+
 ## Доменные сущности
 
-### User (Владелец)
+### Owner
 
-Владелец календаря. Регистрируется в системе, настраивает расписание и типы событий.
+Заранее заданный владелец календаря.
 
 | Поле | Тип | Обязательное | Описание |
 |------|-----|-------------|----------|
-| id | UUID | да | Уникальный идентификатор |
-| email | string | да | Email, уникальный |
-| passwordHash | string | да | Хэш пароля (bcrypt) |
+| id | UUID | да | Уникальный идентификатор владельца |
 | name | string | да | Отображаемое имя |
-| username | string | да | Уникальный username для URL (3-30 символов, латиница + цифры + дефис, начинается с буквы) |
-| timezone | string | да | Таймзона владельца (по умолчанию "UTC") |
+| email | string | да | Email владельца |
+| timezone | string | да | Таймзона владельца |
 | createdAt | datetime | да | Дата создания |
 | updatedAt | datetime | да | Дата обновления |
 
-**Инварианты:**
-- `email` уникален глобально
-- `username` уникален глобально
-- `username` не может быть из списка зарезервированных: admin, api, public, dashboard, login, register, cancel, etc.
+Инварианты:
+- owner один для MVP;
+- owner не создается через публичный API;
+- owner используется по умолчанию во всех `/api/owner/*` endpoints.
 
 ---
 
-### Schedule (Расписание)
+### EventType
 
-Интервалы доступности владельца по дням недели.
+Тип события, который владелец предлагает гостям.
 
 | Поле | Тип | Обязательное | Описание |
 |------|-----|-------------|----------|
 | id | UUID | да | Уникальный идентификатор |
-| userId | UUID | да | FK → User |
-| dayOfWeek | int | да | День недели (0=Вс, 1=Пн, ..., 6=Сб) |
-| startTime | string | да | Начало интервала ("09:00") |
-| endTime | string | да | Конец интервала ("18:00") |
-
-**Инварианты:**
-- Несколько записей на один день (например: 09:00–12:00 + 13:00–18:00 — обеденный перерыв)
-- Интервалы не пересекаются
-- `startTime < endTime`
-- Уникальный constraint: `(userId, dayOfWeek, startTime, endTime)`
-
-**Пример расписания:**
-```
-Пн: 09:00–12:00, 13:00–18:00
-Вт: 09:00–18:00
-Ср: 10:00–16:00
-Чт: 09:00–18:00
-Пт: 09:00–15:00
-Сб: нет (выходной)
-Вс: нет (выходной)
-```
-
----
-
-### EventType (Тип события)
-
-Тип встречи, которую владелец предлагает гостям.
-
-| Поле | Тип | Обязательное | Описание |
-|------|-----|-------------|----------|
-| id | UUID | да | Уникальный идентификатор |
-| userId | UUID | да | FK → User |
-| name | string | да | Название (например, "Консультация") |
-| description | string | нет | Описание |
-| slug | string | да | URL-friendly идентификатор (например, "consultation") |
-| durationMinutes | int | да | Длительность в минутах (по умолчанию 30) |
-| slotInterval | int | да | Шаг сетки слотов в минутах (по умолчанию 30) |
+| ownerId | UUID | да | FK -> Owner |
+| title | string | да | Название события |
+| description | string | нет | Описание события |
+| durationMinutes | int | да | Длительность события в минутах |
 | createdAt | datetime | да | Дата создания |
 | updatedAt | datetime | да | Дата обновления |
 
-**Инварианты:**
-- `slug` уникален в рамках одного владельца: `(userId, slug)`
-- `slug` формат: латиница, цифры, дефис, 2-60 символов
-- `durationMinutes > 0`
-- `slotInterval > 0`
-- `durationMinutes <= slotInterval` или `durationMinutes` кратно `slotInterval`
+Инварианты:
+- `title` не пустой;
+- `durationMinutes > 0`;
+- создание типа события доступно owner/admin части без auth, потому что owner один.
 
 ---
 
-### Booking (Бронирование)
+### Slot
 
-Запись гостя на слот.
+Расчетный слот для выбранного типа события.
 
 | Поле | Тип | Обязательное | Описание |
 |------|-----|-------------|----------|
-| id | UUID | да | Уникальный идентификатор |
-| eventTypeId | UUID | да | FK → EventType |
-| userId | UUID | да | FK → User (владелец, денормализация для быстрого поиска) |
 | startTime | datetime | да | Начало слота |
 | endTime | datetime | да | Конец слота |
-| guestName | string | да | Имя гостя |
-| guestEmail | string | да | Email гостя |
-| guestPhone | string | нет | Телефон гостя |
-| cancelToken | UUID | да | Уникальный токен для отмены |
-| status | enum | да | confirmed / cancelled |
-| cancelledAt | datetime | нет | Дата отмены |
-| createdAt | datetime | да | Дата создания |
+| status | enum | да | `free` или `booked` |
 
-**Инварианты:**
-- `cancelToken` уникален глобально
-- На одно время (`userId + startTime`) не может быть двух подтверждённых бронирований
-- `startTime < endTime`
-- `endTime - startTime = durationMinutes` соответствующего EventType
-- Отмена: `status` меняется на `cancelled`, заполняется `cancelledAt`
-- Повторная отмена невозможна
+Инварианты:
+- слоты формируются на ближайшие 14 дней, начиная с текущей даты;
+- `endTime - startTime = durationMinutes` выбранного типа события;
+- слот не выходит за рамки расписания владельца;
+- `booked` означает, что уже есть confirmed booking на тот же `ownerId + startTime`.
 
 ---
 
-### PasswordReset (Сброс пароля)
+### Booking
+
+Бронирование гостя.
 
 | Поле | Тип | Обязательное | Описание |
 |------|-----|-------------|----------|
 | id | UUID | да | Уникальный идентификатор |
-| userId | UUID | да | FK → User |
-| token | UUID | да | Уникальный токен сброса |
-| expiresAt | datetime | да | Время жизни токена (1 час) |
-| used | boolean | да | Использован ли токен |
+| eventTypeId | UUID | да | FK -> EventType |
+| ownerId | UUID | да | FK -> Owner |
+| startTime | datetime | да | Начало бронирования |
+| endTime | datetime | да | Конец бронирования |
+| guestName | string | да | Имя гостя |
+| guestEmail | string | да | Email гостя |
+| status | enum | да | `confirmed` или `cancelled` |
+| createdAt | datetime | да | Дата создания |
+
+Инварианты:
+- `guestName` не пустой;
+- `guestEmail` валидный;
+- гость может записаться только на свободный слот из 14-дневного окна;
+- на одно время нельзя создать две confirmed записи для одного владельца, даже если выбраны разные типы событий.
 
 ---
 
-## Сценарии
+## Сценарии владельца
 
-### Сценарий 1: Регистрация владельца
+### Сценарий 1: Владелец создает тип события
 
 ```
-Предусловие: username и email свободны
-Действие: POST /api/auth/register { email, password, name, username }
+Действие:
+POST /api/owner/event-types
+{
+  "title": "Intro Call",
+  "description": "30-minute intro call",
+  "durationMinutes": 30
+}
+
 Результат:
-  - Создаётся User с хэшированным паролем
-  - Создаётся расписание по умолчанию (Пн-Пт 09:00–18:00)
-  - Возвращается JWT (access + refresh в httpOnly cookie)
+201 Created
+{
+  "eventType": {
+    "id": "uuid",
+    "ownerId": "uuid",
+    "title": "Intro Call",
+    "description": "30-minute intro call",
+    "durationMinutes": 30,
+    "createdAt": "2026-03-27T11:40:00.000Z",
+    "updatedAt": "2026-03-27T11:40:00.000Z"
+  }
+}
+
 Ошибки:
-  - 409: email или username занят
-  - 400: невалидные данные
+- 400: title пустой или durationMinutes <= 0
 ```
 
-### Сценарий 2: Вход владельца
+### Сценарий 2: Владелец смотрит типы событий
 
 ```
-Действие: POST /api/auth/login { email, password }
+Действие:
+GET /api/owner/event-types
+
 Результат:
-  - Проверяется пароль
-  - Возвращается JWT (access + refresh в httpOnly cookie)
+200 OK
+{
+  "eventTypes": [
+    {
+      "id": "uuid",
+      "ownerId": "uuid",
+      "title": "Intro Call",
+      "description": "30-minute intro call",
+      "durationMinutes": 30,
+      "createdAt": "2026-03-27T11:40:00.000Z",
+      "updatedAt": "2026-03-27T11:40:00.000Z"
+    }
+  ]
+}
+```
+
+### Сценарий 3: Владелец смотрит предстоящие встречи
+
+```
+Действие:
+GET /api/owner/bookings/upcoming
+
+Результат:
+200 OK
+{
+  "bookings": [
+    {
+      "id": "uuid",
+      "eventTypeId": "uuid",
+      "eventTypeTitle": "Intro Call",
+      "ownerId": "uuid",
+      "startTime": "2026-03-28T06:00:00.000Z",
+      "endTime": "2026-03-28T06:30:00.000Z",
+      "guestName": "Demo User",
+      "guestEmail": "demo@example.com",
+      "status": "confirmed",
+      "createdAt": "2026-03-27T11:40:00.000Z"
+    }
+  ]
+}
+```
+
+Правила:
+- возвращаются только будущие confirmed бронирования;
+- бронирования всех типов событий идут в одном списке;
+- сортировка по `startTime ASC`.
+
+---
+
+## Сценарии гостя
+
+### Сценарий 4: Гость смотрит виды брони
+
+```
+Действие:
+GET /api/public/event-types
+
+Результат:
+200 OK
+{
+  "owner": {
+    "id": "uuid",
+    "name": "Demo Owner",
+    "timezone": "Europe/Moscow"
+  },
+  "eventTypes": [
+    {
+      "id": "uuid",
+      "title": "Intro Call",
+      "description": "30-minute intro call",
+      "durationMinutes": 30
+    }
+  ]
+}
+```
+
+### Сценарий 5: Гость смотрит выбранный тип события
+
+```
+Действие:
+GET /api/public/event-types/{eventTypeId}
+
+Результат:
+200 OK
+{
+  "eventType": {
+    "id": "uuid",
+    "title": "Intro Call",
+    "description": "30-minute intro call",
+    "durationMinutes": 30
+  }
+}
+
 Ошибки:
-  - 401: неверный email или пароль
+- 404: тип события не найден
 ```
 
-### Сценарий 3: Проверка username
+### Сценарий 6: Гость смотрит слоты
 
 ```
-Действие: GET /api/auth/check-username?username=alex
+Действие:
+GET /api/public/event-types/{eventTypeId}/slots?dateFrom=2026-03-28&dateTo=2026-04-10
+
 Результат:
-  - { available: true/false }
-  - Проверяется уникальность + формат + зарезервированные имена
-```
+200 OK
+{
+  "days": [
+    {
+      "date": "2026-03-28",
+      "freeCount": 17,
+      "slots": [
+        {
+          "startTime": "2026-03-28T06:00:00.000Z",
+          "endTime": "2026-03-28T06:30:00.000Z",
+          "status": "booked"
+        },
+        {
+          "startTime": "2026-03-28T06:30:00.000Z",
+          "endTime": "2026-03-28T07:00:00.000Z",
+          "status": "free"
+        }
+      ]
+    }
+  ]
+}
 
-### Сценарий 4: Создание типа события
-
-```
-Предусловие: владелец авторизован
-Действие: POST /api/events { name, description?, slug, durationMinutes, slotInterval }
-Результат:
-  - Создаётся EventType, привязанный к текущему владельцу
 Ошибки:
-  - 409: slug уже занят у этого владельца
-  - 401: не авторизован
+- 400: невалидный диапазон дат
+- 404: тип события не найден
 ```
 
-### Сценарий 5: Обновление расписания
+Правила:
+- backend ограничивает `dateTo` значением `today + 14 days`;
+- гость не может забронировать слот вне возвращенного окна;
+- занятые слоты возвращаются для отображения, но недоступны для бронирования.
+
+### Сценарий 7: Гость создает бронирование
 
 ```
-Предусловие: владелец авторизован
-Действие: PUT /api/schedule { intervals: [{ dayOfWeek, startTime, endTime }] }
+Действие:
+POST /api/public/bookings
+{
+  "eventTypeId": "uuid",
+  "startTime": "2026-03-28T06:30:00.000Z",
+  "guestName": "Demo User",
+  "guestEmail": "demo@example.com"
+}
+
 Результат:
-  - Удаляются все старые интервалы владельца
-  - Создаются новые
+201 Created
+{
+  "booking": {
+    "id": "uuid",
+    "eventTypeId": "uuid",
+    "eventTypeTitle": "Intro Call",
+    "ownerId": "uuid",
+    "startTime": "2026-03-28T06:30:00.000Z",
+    "endTime": "2026-03-28T07:00:00.000Z",
+    "guestName": "Demo User",
+    "guestEmail": "demo@example.com",
+    "status": "confirmed",
+    "createdAt": "2026-03-27T11:40:00.000Z"
+  }
+}
+
 Ошибки:
-  - 400: пересекающиеся интервалы, невалидные данные
-  - 401: не авторизован
+- 400: невалидные данные или слот вне окна записи
+- 404: тип события не найден
+- 409: слот уже занят
 ```
 
-### Сценарий 6: Гость просматривает профиль владельца
+---
+
+## API Summary
+
+### Owner/Admin
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/owner/event-types` | Список типов событий владельца |
+| POST | `/api/owner/event-types` | Создать тип события |
+| GET | `/api/owner/bookings/upcoming` | Предстоящие встречи владельца |
+
+### Public
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/public/event-types` | Публичный список видов брони |
+| GET | `/api/public/event-types/{eventTypeId}` | Публичная карточка типа события |
+| GET | `/api/public/event-types/{eventTypeId}/slots` | Слоты выбранного типа события |
+| POST | `/api/public/bookings` | Создать бронирование |
+
+## Генерация слотов
 
 ```
-Действие: GET /api/public/users/:username/events
-Результат:
-  - Список всех EventType владельца: name, description, slug, durationMinutes
-  - Информация о владельце: name
-Ошибки:
-  - 404: username не найден
+1. Получить заранее заданного owner.
+2. Найти EventType по eventTypeId.
+3. Ограничить диапазон дат окном today ... today + 14 дней.
+4. Для каждого дня получить интервалы расписания владельца.
+5. Сгенерировать слоты с шагом 30 минут.
+6. Для каждого слота посчитать endTime = startTime + durationMinutes.
+7. Исключить слоты, которые не помещаются в расписание.
+8. Найти confirmed бронирования владельца в диапазоне.
+9. Пометить слоты как booked/free.
+10. Вернуть список дней со слотами.
 ```
 
-### Сценарий 7: Гость просматривает свободные слоты
+## Error Responses
+
+### ValidationErrorResponse
 
 ```
-Действие: GET /api/public/slots?username=alex&eventSlug=consultation&dateFrom=2026-04-09&dateTo=2026-04-23
-Результат:
-  - Список свободных слотов: [{ startTime, endTime }]
-  - Слоты генерируются из расписания владельца + slotInterval eventType
-  - Вычитаются уже занятые бронирования
-  - Окно: 14 дней от текущей даты (dateTo capped)
-Ошибки:
-  - 404: владелец или тип события не найден
+{
+  "statusCode": 400,
+  "message": "Validation failed",
+  "errors": [
+    { "field": "durationMinutes", "message": "Must be greater than 0" }
+  ]
+}
 ```
 
-### Сценарий 8: Гость создаёт бронирование
+### NotFoundErrorResponse
 
 ```
-Действие: POST /api/public/bookings { username, eventSlug, startTime, guestName, guestEmail, guestPhone? }
-Результат:
-  - Проверяется что слот свободен
-  - Создаётся Booking со status=confirmed и уникальным cancelToken
-  - Возвращается: { booking: { id, startTime, endTime, cancelToken } }
-Ошибки:
-  - 409: слот уже занят (конфликт)
-  - 404: владелец или тип события не найден
-  - 400: невалидные данные, слот вне окна бронирования
+{
+  "statusCode": 404,
+  "message": "Event type not found"
+}
 ```
 
-### Сценарий 9: Гость отменяет бронирование
+### ConflictErrorResponse
 
 ```
-Шаг 1: GET /api/public/bookings/:cancelToken
-Результат: информация о бронировании (startTime, endTime, eventTypeName, ownerName)
-
-Шаг 2: POST /api/public/bookings/:cancelToken/cancel
-Результат:
-  - status → cancelled, заполняется cancelledAt
-Ошибки:
-  - 404: cancelToken не найден
-  - 400: бронирование уже отменено
+{
+  "statusCode": 409,
+  "message": "Slot is already booked"
+}
 ```
-
-### Сценарий 10: Владелец просматривает бронирования
-
-```
-Предусловие: владелец авторизован
-Действие: GET /api/bookings
-Результат:
-  - Список всех бронирований владельца (все типы событий)
-  - Поля: guestName, guestEmail, guestPhone, startTime, endTime, eventTypeName, status
-  - Сортировка: по startTime (ближайшие первыми)
-  - Фильтрация: ?status=confirmed|cancelled
-Ошибки:
-  - 401: не авторизован
-```
-
-### Сценарий 11: Сброс пароля
-
-```
-Шаг 1: POST /api/auth/forgot-password { email }
-Результат:
-  - Генерируется PasswordReset токен
-  - Email с ссылкой отправляется (MVP: console.log)
-  - Всегда 200 (не раскрываем существование email)
-
-Шаг 2: POST /api/auth/reset-password { token, newPassword }
-Результат:
-  - Проверяется токен (существует, не протух, не использован)
-  - Обновляется passwordHash
-  - Токен помечается как использованный
-  - Инвалидируются все refresh token'ы
-Ошибки:
-  - 400: токен невалиден / протух / использован
-```
-
-## Генерация слотов — алгоритм
-
-```
-1. Определяем окно: today ... today + 14 дней
-2. Для каждого дня в окне:
-   a. Находим день недели
-   b. Получаем интервалы расписания владельца для этого дня
-   c. Если интервалов нет — день пропускается
-   d. Для каждого интервала:
-      - Генерируем слоты с шагом slotInterval
-      - Каждый слот имеет длительность durationMinutes
-      - Слот не должен выходить за пределы интервала
-3. Вычитаем из сгенерированных слотов существующие подтверждённые бронирования
-4. Возвращаем список свободных слотов
-```
-
-Пример:
-- Интервал: 09:00–12:00
-- slotInterval: 30 мин
-- durationMinutes: 30 мин
-- Результат: 09:00, 09:30, 10:00, 10:30, 11:00, 11:30
-
-Пример с длительностью > interval:
-- Интервал: 09:00–12:00
-- slotInterval: 30 мин
-- durationMinutes: 60 мин
-- Результат: 09:00, 09:30, 10:00, 10:30 (последний слот 10:30–11:30 помещается, 11:00–12:00 тоже)

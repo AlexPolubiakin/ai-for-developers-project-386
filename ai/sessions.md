@@ -54,3 +54,26 @@
 
 ### Следующий шаг
 Реализовать Auth модуль (регистрация, логин, JWT, password recovery).
+
+## Сессия 3 — 2026-04-29
+
+### Цель
+Пересобрать проект под требования Design First шага: без авторизации, с одним заранее заданным владельцем, owner-сценариями и TypeSpec-контрактом как источником правды.
+
+### Что сделали
+- Обновили `ai/progress.md` под no-auth MVP с owner/public API.
+- Переписали `ai/project-mvp-plan.md` под Design First подход.
+- Переписали `api-contract/api-contract.md`: доменные сущности, сценарии владельца и гостя, ограничения бронирования.
+- Переписали `api-contract/typespec/models.tsp` и `api-contract/typespec/routes.tsp`.
+- Добавили локальные TypeSpec dev-зависимости и npm scripts в `api-contract/package.json`.
+- Проверили TypeSpec-компиляцию командой `npm run compile`.
+
+### Решения
+- **Владелец без auth**: owner один и заранее задан backend-ом.
+- **Owner endpoints**: `/api/owner/event-types` и `/api/owner/bookings/upcoming`.
+- **Public endpoints**: `/api/public/event-types`, slots и bookings.
+- **Rule of occupancy**: конфликт проверяется по `ownerId + startTime`, независимо от типа события.
+- **Auth**: регистрация, JWT и защищенный кабинет перенесены в post-MVP.
+
+### Следующий шаг
+Реализовать backend по новому TypeSpec-контракту: owner event types, public event types, slots, bookings и upcoming bookings.

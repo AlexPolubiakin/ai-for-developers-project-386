@@ -2,299 +2,320 @@
 
 ## Обзор
 
-Приложение для бронирования встреч по типу cal.com. Несколько владельцев календарей. Гости бронируют без регистрации. Каждый владелец имеет свой профиль с уникальным username и настраиваемым расписанием.
+«Запись на звонок» — упрощенный сервис бронирования времени по мотивам Cal.com. Проект выполняется в подходе Design First: сначала фиксируем внешнее поведение и API-контракт, затем отдельно реализуем frontend и backend по этому контракту.
+
+В MVP нет регистрации и авторизации. Владелец календаря один и заранее задан в системе. Этот профиль по умолчанию используется в owner/admin части. Гости бронируют слоты без аккаунта и без входа.
 
 ## Стек
 
 | Слой | Технология |
 |------|-----------|
+| API Contract | TypeSpec + OpenAPI |
 | Frontend | React + Vite + Mantine UI + TypeScript |
 | Backend | NestJS + Prisma + TypeScript |
 | Database | PostgreSQL |
-| Auth | JWT (httpOnly cookie) |
-| Testing | Jest, Vitest + Testing Library, Playwright |
+| Testing | Jest, Vitest + Testing Library |
 | Infra | Docker Compose |
+
+## MVP Scope
+
+### Входит в MVP
+
+- TypeSpec-спецификация как единый источник правды для frontend и backend
+- Один заранее заданный владелец календаря
+- Owner/admin сценарий без авторизации:
+  - создание типов событий;
+  - просмотр списка типов событий;
+  - просмотр предстоящих встреч по всем типам событий.
+- Guest сценарий без авторизации:
+  - просмотр публичного списка видов брони;
+  - выбор типа события;
+  - просмотр свободных слотов на ближайшие 14 дней;
+  - создание бронирования на свободный слот.
+- Проверка занятости: на одно время нельзя создать две записи даже для разных типов событий
+- UI по скриншотам из `screens/`
+
+### Не входит в MVP
+
+- Регистрация и логин
+- JWT, cookies, password reset
+- Несколько владельцев календарей
+- Редактирование и удаление типов событий
+- Редактор расписания
+- Интеграции с внешними календарями
+- Email-уведомления
+- Отмена бронирования по ссылке
 
 ## Роли
 
-### Владелец (Owner)
-- Регистрируется с email, паролем, username
-- Настраивает расписание (интервалы по дням недели)
-- Создаёт типы событий (название, описание, длительность, slug)
-- Просматривает список всех бронирований
-- Управляет событиями и расписанием из дашборда
+### Владелец календаря
 
-### Гость (Guest)
-- Без регистрации и авторизации
-- Просматривает публичный профиль владельца по `/:username`
-- Выбирает тип события
-- Смотрит свободные слоты на 14 дней вперёд
-- Бронирует слот (имя, email, телефон опционально)
-- Отменяет бронирование по ссылке с уникальным токеном
+Владелец не регистрируется и не входит в систему. Backend всегда использует заранее заданный owner profile.
+
+Владелец может:
+- создавать типы событий;
+- видеть список созданных типов событий;
+- видеть страницу предстоящих встреч, где собраны бронирования всех типов событий.
+
+### Гость
+
+Гость не создает аккаунт.
+
+Гость может:
+- посмотреть страницу с видами брони;
+- выбрать тип события;
+- открыть календарь и выбрать свободный слот в ближайшие 14 дней;
+- создать бронирование, указав имя и email.
 
 ## Доменные сущности
 
-### User
-```
-id              String    @id @default(uuid())
-email           String    @unique
-passwordHash    String
-name            String
-username        String    @unique (3-30 символов, латиница + цифры + дефис, начинается с буквы)
-timezone        String    (default: "UTC")
-createdAt       DateTime
-updatedAt       DateTime
-```
+### Owner
 
-### Schedule
+Заранее заданный владелец календаря.
+
 ```
-id              String    @id @default(uuid())
-userId          String    (FK → User)
-dayOfWeek       Int       (0=Вс, 1=Пн, ..., 6=Сб)
-startTime       String    ("09:00")
-endTime         String    ("18:00")
+id          string
+name        string
+email       string
+timezone    string
+createdAt   datetime
+updatedAt   datetime
 ```
-- Несколько записей на один день (для перерывов)
-- Уникальный constraint: `(userId, dayOfWeek, startTime, endTime)`
 
 ### EventType
-```
-id                String    @id @default(uuid())
-userId            String    (FK → User)
-name              String
-description       String?
-slug              String    (уникальный в рамках пользователя)
-durationMinutes   Int       (по умолчанию 30)
-slotInterval      Int       (шаг сетки в минутах, по умолчанию 30)
-createdAt         DateTime
-updatedAt         DateTime
-```
-- Составной unique constraint: `(userId, slug)`
 
-### Booking
-```
-id              String    @id @default(uuid())
-eventTypeId     String    (FK → EventType)
-userId          String    (FK → User)
-startTime       DateTime
-endTime         DateTime
-guestName       String
-guestEmail      String
-guestPhone      String?
-cancelToken     String    @unique (UUID)
-status          BookingStatus (confirmed | cancelled)
-cancelledAt     DateTime?
-createdAt       DateTime
-```
-
-### PasswordReset
-```
-id              String    @id @default(uuid())
-userId          String    (FK → User)
-token           String    @unique (UUID)
-expiresAt       DateTime
-used            Boolean   @default(false)
-```
-
-### BookingStatus (enum)
-```
-confirmed
-cancelled
-```
-
-## Правила бронирования
-
-1. **Окно бронирования**: слоты формируются на 14 дней вперёд от текущей даты
-2. **Занятость**: на одно время нельзя создать две записи, даже если разные типы событий
-3. **Генерация слотов**: вычисляются на лету из расписания владельца + длительности события + шага сетки, минус существующие бронирования
-4. **Timezone**: таймзона определяется из браузера гостя, гость может переключить вручную. Слоты показываются в выбранной timezone
-
-## URL-схема
-
-### Публичные страницы (гость)
-```
-/                              — лендинг
-/:username                     — профиль владельца, список его типов событий
-/:username/:eventSlug          — страница бронирования (календарь + форма)
-/cancel/:cancelToken           — страница отмены бронирования
-```
-
-### Auth
-```
-/login                         — вход
-/register                      — регистрация
-/forgot-password               — запрос сброса пароля
-/reset-password?token=xxx      — сброс пароля
-```
-
-### Dashboard (владелец)
-```
-/dashboard                     — дашборд
-/dashboard/events              — список типов событий
-/dashboard/events/new          — создать тип события
-/dashboard/events/:id/edit     — редактировать
-/dashboard/schedule            — расписание (интервалы по дням)
-/dashboard/bookings            — список бронирований
-```
-
-## API-эндпоинты
-
-### Auth
-```
-POST   /api/auth/register          — регистрация
-POST   /api/auth/login             — вход
-POST   /api/auth/logout            — выход
-POST   /api/auth/forgot-password   — запрос сброса пароля
-POST   /api/auth/reset-password    — сброс пароля по токену
-GET    /api/auth/me                — текущий пользователь
-GET    /api/auth/check-username    — проверка доступности username
-```
-
-### Public (гость, без авторизации)
-```
-GET    /api/public/users/:username/events              — список типов событий
-GET    /api/public/users/:username/events/:slug         — тип события по slug
-GET    /api/public/slots?username=&eventSlug=&dateFrom=&dateTo=  — свободные слоты
-POST   /api/public/bookings                             — создать бронирование
-GET    /api/public/bookings/:cancelToken                — информация о бронировании
-POST   /api/public/bookings/:cancelToken/cancel         — отменить бронирование
-```
-
-### Admin (владелец, JWT)
-```
-GET    /api/events                 — свои типы событий
-POST   /api/events                 — создать
-PUT    /api/events/:id             — обновить
-DELETE /api/events/:id             — удалить
-
-GET    /api/schedule               — своё расписание
-PUT    /api/schedule               — обновить расписание (массив интервалов)
-
-GET    /api/bookings               — список бронирований
-GET    /api/bookings/:id           — детали бронирования
-```
-
-## Auth — детали реализации
-
-### JWT в httpOnly cookie
+Тип события, который владелец предлагает гостям.
 
 ```
-Access Token:
-  - Формат: JWT
-  - TTL: 15 минут
-  - Хранение: httpOnly cookie (secure, sameSite=strict)
-  - Содержимое: { userId, email }
-
-Refresh Token:
-  - Формат: JWT
-  - TTL: 7 дней
-  - Хранение: httpOnly cookie + таблица в БД (для отзыва)
-  - При logout — удаляется из БД и очищается cookie
+id                string
+ownerId           string
+title             string
+description       string?
+durationMinutes   int
+createdAt         datetime
+updatedAt         datetime
 ```
-
-### Password Recovery
-```
-1. POST /api/auth/forgot-password { email }
-   → Генерируем resetToken (UUID, TTL 1 час)
-   → Сохраняем в PasswordReset
-   → Отправляем email (MVP: console.log)
-   → Возвращаем 200 (всегда, чтобы не утечь информацию о существовании email)
-
-2. POST /api/auth/reset-password { token, newPassword }
-   → Проверяем токен (существует, не протух, не использован)
-   → Обновляем passwordHash
-   → Помечаем токен как использованный
-   → Инвалидируем все refresh token'ы
-   → Возвращаем 200
-```
-
-### Валидация username
-```
-GET /api/auth/check-username?username=alex
-→ { available: boolean }
 
 Правила:
-  - 3-30 символов
-  - Латиница, цифры, дефис
-  - Начинается с буквы
-  - Нельзя использовать зарезервированные: admin, api, public, dashboard, etc.
+- `title` обязателен;
+- `durationMinutes > 0`;
+- в MVP создание доступно без auth, потому что owner один.
+
+### Slot
+
+Расчетный интервал времени, доступный или занятый для бронирования.
+
+```
+startTime   datetime
+endTime     datetime
+status      free | booked
 ```
 
-## Структура проекта
+Правила:
+- слоты формируются на ближайшие 14 дней, начиная с текущей даты;
+- слот должен полностью помещаться в расписание владельца;
+- статус `booked` означает, что на `ownerId + startTime` уже есть подтвержденная бронь.
+
+### Booking
+
+Бронирование гостя на слот.
 
 ```
-ai/
-  README.md
-  progress.md
-  sessions.md
-  project-mvp-plan.md
-
-api-contract/
-  api-contract.md
-  typespec/
-    main.tsp
-    models.tsp
-    routes.tsp
-
-frontend/
-  src/
-    components/
-    pages/
-      public/
-      auth/
-      dashboard/
-    hooks/
-    api/
-    utils/
-    types/
-  tests/
-  Dockerfile
-
-backend/
-  src/
-    modules/
-      auth/
-      users/
-      events/
-      schedule/
-      bookings/
-      slots/
-    prisma/
-      schema.prisma
-      seed.ts
-    common/
-  tests/
-  prisma/
-    migrations/
-  Dockerfile
-
-docker-compose.yml
+id            string
+eventTypeId   string
+ownerId       string
+startTime     datetime
+endTime       datetime
+guestName     string
+guestEmail    string
+status        confirmed | cancelled
+createdAt     datetime
 ```
 
-## Пошаговый план
+Правила:
+- `guestName` и `guestEmail` обязательны;
+- `startTime < endTime`;
+- `endTime - startTime = durationMinutes` выбранного типа события;
+- на одно и то же `ownerId + startTime` нельзя создать две confirmed записи;
+- гость может записаться только на свободный слот из 14-дневного окна.
 
-| # | Задача |
-|---|--------|
-| 1 | Создать `ai/` со всеми md-файлами |
-| 2 | Написать `project-mvp-plan.md` |
-| 3 | Написать `specs/api-contract.md` |
-| 4 | Написать TypeSpec (`specs/typespec/`) |
-| 5 | Инициализировать `backend/` |
-| 6 | Инициализировать `frontend/` |
-| 7 | Prisma schema + миграции + seed |
-| 8 | Docker Compose |
-| 9 | Backend: Auth модуль |
-| 10 | Backend: Events модуль |
-| 11 | Backend: Schedule модуль |
-| 12 | Backend: Slots сервис |
-| 13 | Backend: Bookings модуль |
-| 14 | Frontend: Auth страницы |
-| 15 | Frontend: Dashboard — Events |
-| 16 | Frontend: Dashboard — Schedule |
-| 17 | Frontend: Dashboard — Bookings |
-| 18 | Frontend: Публичные страницы |
-| 19 | Backend тесты (Unit + Integration) |
-| 20 | Frontend тесты (Unit + Component) |
-| 21 | E2E тесты (Playwright) |
-| 22 | CI (GitHub Actions) |
-| 23 | Email-уведомления (Resend) — post-MVP |
+## URL-схема Frontend
+
+```
+/                       — лендинг
+/events                 — публичный список видов брони
+/events/:eventTypeId    — выбор даты и слота для типа события
+/owner/event-types      — owner/admin список и создание типов событий
+/owner/bookings         — owner/admin предстоящие встречи
+```
+
+Если времени мало, `/events/:eventTypeId` может быть реализован как `/book?eventTypeId=...`, но API-контракт должен оставаться независимым от конкретной frontend-навигации.
+
+## API-эндпоинты MVP
+
+Все endpoints публичные на уровне транспорта. Auth guard не используется.
+
+### Owner/Admin
+
+```
+GET  /api/owner/event-types
+POST /api/owner/event-types
+GET  /api/owner/bookings/upcoming
+```
+
+### Public Guest
+
+```
+GET  /api/public/event-types
+GET  /api/public/event-types/{eventTypeId}
+GET  /api/public/event-types/{eventTypeId}/slots?dateFrom=&dateTo=
+POST /api/public/bookings
+```
+
+## Основные сценарии
+
+### Сценарий владельца: создание типа события
+
+```
+Действие:
+POST /api/owner/event-types
+{
+  "title": "Intro Call",
+  "description": "30-minute intro call",
+  "durationMinutes": 30
+}
+
+Результат:
+- создается EventType для заранее заданного owner;
+- возвращается созданный тип события.
+
+Ошибки:
+- 400: невалидное название или длительность.
+```
+
+### Сценарий владельца: просмотр предстоящих встреч
+
+```
+Действие:
+GET /api/owner/bookings/upcoming
+
+Результат:
+- возвращаются confirmed бронирования всех типов событий;
+- сортировка по startTime ASC;
+- прошедшие встречи не возвращаются.
+```
+
+### Сценарий гостя: выбор вида брони
+
+```
+Действие:
+GET /api/public/event-types
+
+Результат:
+- список типов событий с id, title, description, durationMinutes.
+```
+
+### Сценарий гостя: просмотр слотов
+
+```
+Действие:
+GET /api/public/event-types/{eventTypeId}/slots?dateFrom=2026-03-28&dateTo=2026-04-10
+
+Результат:
+- список дней и слотов;
+- свободные и занятые слоты различаются status;
+- dateTo ограничивается окном today + 14 дней.
+
+Ошибки:
+- 404: тип события не найден;
+- 400: невалидный диапазон дат.
+```
+
+### Сценарий гостя: создание бронирования
+
+```
+Действие:
+POST /api/public/bookings
+{
+  "eventTypeId": "event-type-id",
+  "startTime": "2026-03-28T06:30:00.000Z",
+  "guestName": "Alex",
+  "guestEmail": "alex@example.com"
+}
+
+Результат:
+- backend проверяет, что слот существует и свободен;
+- создается Booking со status=confirmed;
+- возвращается созданное бронирование.
+
+Ошибки:
+- 400: невалидные данные или слот вне окна записи;
+- 404: тип события не найден;
+- 409: слот уже занят.
+```
+
+## Генерация слотов
+
+```mermaid
+flowchart LR
+  eventType["Event type"] --> duration["Duration"]
+  schedule["Owner schedule"] --> generate["Generate slots"]
+  duration --> generate
+  bookings["Confirmed bookings"] --> markBooked["Mark booked slots"]
+  generate --> markBooked
+  markBooked --> response["Slots response"]
+```
+
+Алгоритм:
+
+```
+1. Получить eventType и заранее заданного owner.
+2. Ограничить dateFrom/dateTo окном today ... today + 14 дней.
+3. Для каждого дня найти интервалы расписания owner.
+4. Разбить интервалы на слоты с шагом 30 минут.
+5. Для каждого слота посчитать endTime = startTime + eventType.durationMinutes.
+6. Исключить слоты, которые не помещаются в интервал расписания.
+7. Найти confirmed bookings владельца в диапазоне.
+8. Пометить слот как booked, если уже есть booking с тем же ownerId + startTime.
+9. Вернуть дни со слотами и счетчиком свободных слотов.
+```
+
+## TypeSpec Requirements
+
+TypeSpec должен описывать:
+- доменные модели `Owner`, `EventType`, `Slot`, `Booking`;
+- request/response модели для owner и public сценариев;
+- error responses для `400`, `404`, `409`;
+- endpoint-набор из раздела API;
+- правило отсутствия auth endpoints в MVP-контракте.
+
+## Порядок реализации
+
+1. Обновить `api-contract/api-contract.md`.
+2. Обновить `api-contract/typespec/models.tsp`.
+3. Обновить `api-contract/typespec/routes.tsp`.
+4. Проверить TypeSpec/OpenAPI генерацию.
+5. Реализовать backend по контракту.
+6. Реализовать frontend по контракту и скриншотам.
+7. Проверить основной сценарий вручную.
+
+## Тестирование MVP
+
+Минимально:
+- TypeSpec компилируется;
+- backend проверяет конфликт бронирования;
+- frontend может создать тип события;
+- frontend может создать бронь на свободный слот;
+- owner page показывает созданную бронь.
+
+## Post-MVP
+
+- Авторизация владельца
+- Защищенный кабинет
+- Редактирование и удаление типов событий
+- Редактор расписания
+- Отмена бронирования по ссылке
+- Email-уведомления
+- Напоминания
+- GitHub Actions
+- E2E-тесты
