@@ -1,6 +1,6 @@
-import { Controller } from "@nestjs/common";
+import { Controller } from '@nestjs/common';
 
-@Controller("api/users")
+@Controller('api/users')
 export class UsersController {
   // TODO: implement users endpoints
 }

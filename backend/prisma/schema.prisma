@@ -1,58 +1,52 @@
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated"
+  provider     = "prisma-client"
+  output       = "../src/generated"
+  moduleFormat = "cjs"
 }
 
 datasource db {
   provider = "postgresql"
 }
 
-model User {
-  id           String   @id @default(uuid())
-  email        String   @unique
-  passwordHash String
-  name         String
-  username     String   @unique
-  timezone     String   @default("UTC")
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+model Owner {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String
+  timezone  String   @default("UTC")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  schedule       ScheduleInterval[]
-  eventTypes     EventType[]
-  bookings       Booking[]
-  passwordResets PasswordReset[]
-  refreshTokens  RefreshToken[]
+  schedule   ScheduleInterval[]
+  eventTypes EventType[]
+  bookings   Booking[]
 }
 
 model ScheduleInterval {
   id        String @id @default(uuid())
-  userId    String
+  ownerId   String
   dayOfWeek Int
   startTime String
   endTime   String
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  owner Owner @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, dayOfWeek, startTime, endTime])
-  @@index([userId])
+  @@unique([ownerId, dayOfWeek, startTime, endTime])
+  @@index([ownerId])
 }
 
 model EventType {
   id              String   @id @default(uuid())
-  userId          String
-  name            String
+  ownerId         String
+  title           String
   description     String?
-  slug            String
   durationMinutes Int      @default(30)
-  slotInterval    Int      @default(30)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  owner    Owner     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   bookings Booking[]
 
-  @@unique([userId, slug])
-  @@index([userId])
+  @@index([ownerId])
 }
 
 enum BookingStatus {
@@ -63,45 +57,18 @@ enum BookingStatus {
 model Booking {
   id           String        @id @default(uuid())
   eventTypeId  String
-  userId       String
+  ownerId      String
   startTime    DateTime
   endTime      DateTime
   guestName    String
   guestEmail   String
-  guestPhone   String?
-  cancelToken  String        @unique
   status       BookingStatus @default(confirmed)
-  cancelledAt  DateTime?
   createdAt    DateTime      @default(now())
 
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  owner     Owner     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   eventType EventType @relation(fields: [eventTypeId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, startTime])
-  @@index([userId, startTime])
+  @@unique([ownerId, startTime])
+  @@index([ownerId, startTime])
   @@index([eventTypeId])
-}
-
-model PasswordReset {
-  id        String   @id @default(uuid())
-  userId    String
-  token     String   @unique
-  expiresAt DateTime
-  used      Boolean  @default(false)
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([token])
-  @@index([userId])
-}
-
-model RefreshToken {
-  id        String   @id @default(uuid())
-  userId    String
-  token     String   @unique
-  expiresAt DateTime
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
 }

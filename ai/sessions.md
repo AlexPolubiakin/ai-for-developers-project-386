@@ -98,3 +98,26 @@
 
 ### Следующий шаг
 Реализовать backend MVP по тому же контракту и затем прогнать основной сценарий вручную на реальном API или Prism mock.
+
+## Сессия 5 — 2026-04-29
+
+### Цель
+Реализовать backend MVP по актуальному TypeSpec-контракту: owner/public API, слоты, бронирование и проверка конфликтов.
+
+### Что сделали
+- Упростили Prisma schema под no-auth MVP: `Owner`, `ScheduleInterval`, `EventType`, `Booking`.
+- Обновили seed под одного demo owner, рабочее расписание и демо-типы событий.
+- Реализовали endpoints `/api/owner/event-types`, `/api/owner/bookings/upcoming`, `/api/public/event-types`, `/api/public/event-types/:eventTypeId`, `/api/public/event-types/:eventTypeId/slots`, `/api/public/bookings`.
+- Реализовали генерацию слотов на 14 дней с учетом расписания owner, таймзоны и confirmed bookings.
+- Реализовали создание бронирования только на свободный слот и обработку `409 Slot is already booked`.
+- Добавили unit-тесты на ключевые правила бронирования.
+- Проверили backend командами `npx prisma generate`, `npm run lint`, `npm test`, `npm run build`.
+
+### Решения
+- **PostgreSQL вместо in-memory**: оставили стек, уже зафиксированный в проекте и scaffold, чтобы не расходиться с текущей архитектурой.
+- **Один owner из БД**: backend берет первого заранее засеянного owner и использует его для всех owner/public сценариев.
+- **Конфликт бронирования**: проверяется по `ownerId + startTime`, дополнительно защищен уникальным индексом Prisma.
+- **Маршруты NestJS**: контроллеры объявляют пути без префикса `api`, потому что глобальный prefix задается в `main.ts`.
+
+### Следующий шаг
+Применить schema к локальной БД, запустить backend/frontend и вручную проверить основной сценарий: создать тип события, выбрать слот, создать бронь и увидеть ее в списке upcoming.
