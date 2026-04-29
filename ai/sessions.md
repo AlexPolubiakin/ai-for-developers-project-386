@@ -77,3 +77,24 @@
 
 ### Следующий шаг
 Реализовать backend по новому TypeSpec-контракту: owner event types, public event types, slots, bookings и upcoming bookings.
+
+## Сессия 4 — 2026-04-29
+
+### Цель
+Реализовать Frontend MVP как отдельное приложение, работающее только через актуальный owner/public API-контракт.
+
+### Что сделали
+- Синхронизировали `frontend/SCREENS.md` с no-auth MVP, route scheme и TypeSpec endpoints.
+- Переписали frontend-типы и API-клиент под `/api/public/*` и `/api/owner/*`.
+- Заменили Vite starter на Mantine-приложение с общим header/layout.
+- Реализовали лендинг `/`, список типов событий `/events`, booking flow `/events/:eventTypeId`, owner-форму `/owner/event-types` и список броней `/owner/bookings`.
+- Добавили loading/error/empty состояния, disabled состояния для кнопок и обработку ошибок бронирования.
+- Проверили frontend командами `npm run lint` и `npm run build`.
+
+### Решения
+- **UI stack**: оставили React + Vite + Mantine без shadcn/ui, чтобы не смешивать UI-библиотеки.
+- **Routing**: сделали легкий History API router внутри приложения, достаточный для текущего MVP.
+- **API source of truth**: frontend использует только endpoints из актуального контракта.
+
+### Следующий шаг
+Реализовать backend MVP по тому же контракту и затем прогнать основной сценарий вручную на реальном API или Prism mock.

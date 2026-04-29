@@ -1,98 +1,105 @@
-export interface User {
+export interface OwnerPublic {
   id: string;
-  email: string;
   name: string;
-  username: string;
   timezone: string;
 }
 
 export interface EventType {
   id: string;
-  userId: string;
-  name: string;
+  ownerId: string;
+  title: string;
   description?: string;
-  slug: string;
   durationMinutes: number;
-  slotInterval: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface EventTypePublic {
-  name: string;
-  slug: string;
+  id: string;
+  title: string;
   description?: string;
   durationMinutes: number;
 }
 
-export interface ScheduleInterval {
-  dayOfWeek: number;
-  startTime: string;
-  endTime: string;
-}
+export type SlotStatus = "free" | "booked";
 
 export interface Slot {
   startTime: string;
   endTime: string;
+  status: SlotStatus;
 }
+
+export interface SlotDay {
+  date: string;
+  freeCount: number;
+  slots: Slot[];
+}
+
+export type BookingStatus = "confirmed" | "cancelled";
 
 export interface Booking {
   id: string;
   eventTypeId: string;
-  userId: string;
+  eventTypeTitle: string;
+  ownerId: string;
   startTime: string;
   endTime: string;
   guestName: string;
   guestEmail: string;
-  guestPhone?: string;
-  cancelToken: string;
-  status: "confirmed" | "cancelled";
-  cancelledAt?: string;
+  status: BookingStatus;
   createdAt: string;
 }
 
-export interface BookingPublic {
-  id: string;
-  startTime: string;
-  endTime: string;
-  cancelToken: string;
+export interface CreateEventTypeRequest {
+  title: string;
+  description?: string;
+  durationMinutes: number;
 }
 
-export interface BookingWithEvent {
-  id: string;
+export interface CreateBookingRequest {
+  eventTypeId: string;
+  startTime: string;
   guestName: string;
   guestEmail: string;
-  guestPhone?: string;
-  startTime: string;
-  endTime: string;
-  eventTypeName: string;
-  eventTypeSlug: string;
-  status: "confirmed" | "cancelled";
-  createdAt: string;
 }
 
-export interface BookingDetails {
-  startTime: string;
-  endTime: string;
-  eventTypeName: string;
-  ownerName: string;
-  status: "confirmed" | "cancelled";
+export interface OwnerEventTypesResponse {
+  eventTypes: EventType[];
 }
 
-export interface PublicEventsResponse {
-  owner: {
-    name: string;
-    username: string;
-  };
-  events: EventTypePublic[];
+export interface CreatedEventTypeResponse {
+  statusCode: 201;
+  eventType: EventType;
 }
 
-export interface AuthResponse {
-  user: User;
+export interface PublicEventTypesResponse {
+  owner: OwnerPublic;
+  eventTypes: EventTypePublic[];
+}
+
+export interface PublicEventTypeResponse {
+  eventType: EventTypePublic;
 }
 
 export interface SlotsResponse {
-  slots: Slot[];
+  days: SlotDay[];
+}
+
+export interface CreatedBookingResponse {
+  statusCode: 201;
+  booking: Booking;
 }
 
 export interface BookingsListResponse {
-  bookings: BookingWithEvent[];
+  bookings: Booking[];
+}
+
+export interface ApiErrorResponse {
+  statusCode: number;
+  message: string;
+  error?: string;
+  errors?: Array<{
+    field: string;
+    message: string;
+  }>;
 }
